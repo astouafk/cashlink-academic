@@ -1,0 +1,143 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  phone         String   @unique
+  password      String
+  firstName     String
+  lastName      String
+  isKycVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  wallets Wallet[]
+  qrCodes QRCode[]
+}
+
+model Wallet {
+  id               String       @id @default(uuid())
+  userId           String
+  provider         Provider
+  accountNumber    String       @unique
+  balance          Decimal      @default(0)
+  availableBalance Decimal      @default(0)
+  currency         String       @default("XOF")
+  status           WalletStatus @default(ACTIVE)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  user                 User          @relation(fields: [userId], references: [id])
+  sentTransactions     Transaction[] @relation("SentTransactions")
+  receivedTransactions Transaction[] @relation("ReceivedTransactions")
+  qrCodes              QRCode[]
+}
+
+model Transaction {
+  id             String            @id @default(uuid())
+  reference      String            @unique
+  sourceWalletId String
+  destWalletId   String
+  amount         Decimal
+  fees           Decimal
+  status         TransactionStatus
+  type           TransactionType
+  sourceProvider Provider
+  destProvider   Provider
+  initiatedBy    InitiationType
+  qrCodeId       String?
+  metadata       Json?
+  createdAt      DateTime          @default(now())
+  completedAt    DateTime?
+
+  sourceWallet Wallet  @relation("SentTransactions", fields: [sourceWalletId], references: [id])
+  destWallet   Wallet  @relation("ReceivedTransactions", fields: [destWalletId], references: [id])
+  qrCode       QRCode? @relation(fields: [qrCodeId], references: [id])
+}
+
+model QRCode {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  walletId    String
+  userId      String
+  amount      Decimal?
+  description String?
+  expiresAt   DateTime
+  usageLimit  Int      @default(1)
+  usageCount  Int      @default(0)
+  status      QRStatus @default(ACTIVE)
+  type        QRType
+  createdAt   DateTime @default(now())
+
+  wallet       Wallet        @relation(fields: [walletId], references: [id])
+  user         User          @relation(fields: [userId], references: [id])
+  transactions Transaction[]
+}
+
+model SimulatedAccount {
+  id               String   @id @default(uuid())
+  accountNumber    String   @unique
+  provider         Provider
+  balance          Decimal  @default(0)
+  availableBalance Decimal  @default(0)
+  status           String   @default("ACTIVE")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+enum Provider {
+  WAVE
+  ORANGE_MONEY
+  FREE_MONEY
+  MTN_MONEY
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
+enum TransactionType {
+  TRANSFER
+  DEPOSIT
+  WITHDRAWAL
+  QR_PAYMENT
+}
+
+enum InitiationType {
+  MANUAL
+  QR_CODE
+  API
+  SCHEDULED
+}
+
+enum QRStatus {
+  ACTIVE
+  USED
+  EXPIRED
+  CANCELLED
+}
+
+enum QRType {
+  STATIC_PAYMENT
+  DYNAMIC_PAYMENT
+  WALLET_IDENTIFIER
+  QUICK_TRANSFER
+}
+
+enum WalletStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
